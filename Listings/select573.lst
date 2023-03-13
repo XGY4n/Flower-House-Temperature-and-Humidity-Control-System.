@@ -1,0 +1,46 @@
+C51 COMPILER V9.56.0.0   SELECT573                                                         07/06/2022 13:48:31 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE SELECT573
+OBJECT MODULE PLACED IN .\Objects\select573.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE select573.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings
+                    -\select573.lst) OBJECT(.\Objects\select573.obj)
+
+line level    source
+
+   1          #include "select573.h"
+   2          void SelectHC573(unsigned char channel)
+   3          {
+   4   1              switch(channel)
+   5   1              {
+   6   2                      case 4:
+   7   2                              P2=(P2&0x1f)|0x80;  //高三位清零：0001 1111 高三位1000 0000
+   8   2                              break;
+   9   2                      case 5:
+  10   2                              P2=(P2&0x1f)|0xa0;  //高三位清零：0001 1111 高三位1010 0000
+  11   2                              break;
+  12   2                      case 6:
+  13   2                              P2=(P2&0x1f)|0xc0;  //高三位清零：0001 1111 高三位1100 0000
+  14   2                              break;
+  15   2                      case 7:
+  16   2                              P2=(P2&0x1f)|0xe0;  //高三位清零：0001 1111 高三位1110 0000
+  17   2                              break;
+  18   2                      case 0:
+  19   2                              P2=(P2&0x1f)|0x00;
+  20   2                        break;
+  21   2              }
+  22   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     57    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

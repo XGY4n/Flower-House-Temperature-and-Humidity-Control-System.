@@ -1,0 +1,503 @@
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          #include <reg52.h>
+   2          #include "delay.h"
+   3          #include "ds1302.h"
+   4          #include "smg.h"
+   5          #include "onewire.h"
+   6          #include "iic.h"
+   7          #include "select573.h"
+   8          bit readTimeFlag=0;
+   9          bit auto_flag = 0;
+  10          bit S7_switch = 0;
+  11          bit is_select = 0;
+  12          bit is_sys = 0;
+  13          bit is_alarm = 1;
+  14          
+  15          sbit S7 = P1^0;
+  16          sbit S6 = P1^1;
+  17          sbit S5 = P1^2;
+  18          sbit S4 = P1^3;
+  19          
+  20          unsigned char max_limt[3] = {2,5};
+  21          unsigned char low_limt[3] = {1,0};
+  22          
+  23          unsigned int tempL;
+  24          unsigned int tempH;
+  25          
+  26          
+  27          extern unsigned char cur_time_buf[8];
+  28          
+  29          sbit LED_AUTO = P0;
+  30          sbit SPEAKER = P3^3;
+  31          sendBytesTo24C02(unsigned char suba,unsigned char *p,unsigned char no);
+  32          void Alarm(unsigned int count)
+  33          {
+  34   1              unsigned char i;
+  35   1              while(count>0)
+  36   1              {
+  37   2                      for(i=0;i<200;i++)
+  38   2                      {
+  39   3                              DelayUs2x(200); 
+  40   3                              SPEAKER=!SPEAKER;
+  41   3                      }
+  42   2                      SPEAKER=0;
+  43   2                      DelayMs(100);  
+  44   2                      count--;
+  45   2              }       
+  46   1      }
+  47          
+  48          void init_timer0()
+  49          {
+  50   1              TMOD= 0X01;
+  51   1              TH0 = (65536 - 10000) / 256;
+  52   1              TL0 = (65536 - 10000) % 256;
+  53   1              ET0 = 1;
+  54   1              TR0 = 1;
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 2   
+
+  55   1              EA  = 1;
+  56   1      }
+  57          
+  58          void timer0_Sevr() interrupt 1
+  59          {
+  60   1              static unsigned char cnt1,cnt2;
+  61   1              TH0 = (65536 - 10000) / 256;
+  62   1              TL0 = (65536 - 10000) % 256;
+  63   1              cnt1++;
+  64   1              if(cnt1==1)
+  65   1              {
+  66   2                      cnt1=0;
+  67   2                      SelectHC573(6);
+  68   2                      P0 = 0x00;
+  69   2                      SelectHC573(7);
+  70   2                      showLed();
+  71   2                      P0 = 0x00;
+  72   2                      SelectHC573(0);
+  73   2              }
+  74   1              cnt2++;
+  75   1              if(cnt2==200)
+  76   1              {
+  77   2                      cnt2=0;
+  78   2                      readTimeFlag=1;
+  79   2                      TR0=0;
+  80   2              }
+  81   1      
+  82   1      }
+  83          unsigned int Read_Temperature()
+  84          {
+  85   1          unsigned char LSB,MSB;
+  86   1          unsigned int T_dat;
+  87   1          TR1=0;
+  88   1          Init_DS18B20();
+  89   1          Write_DS18B20(0xCC);
+  90   1          Write_DS18B20(0x44);
+  91   1          TR1=1;
+  92   1          TR1=0;
+  93   1          Init_DS18B20();
+  94   1          Write_DS18B20(0xCC);
+  95   1          Write_DS18B20(0xBE);
+  96   1          LSB=Read_DS18B20();
+  97   1          MSB=Read_DS18B20();
+  98   1          Init_DS18B20();
+  99   1          TR1=1;
+ 100   1          
+ 101   1          T_dat=0x0000;
+ 102   1          T_dat=MSB;
+ 103   1          T_dat<<=8;
+ 104   1          T_dat=T_dat|LSB;
+ 105   1          
+ 106   1          return T_dat;
+ 107   1       
+ 108   1      }
+ 109          void doShowTemperature()
+ 110          {
+ 111   1          unsigned int T_dat;
+ 112   1          float temp_f;
+ 113   1          char temp_z;
+ 114   1          char temp_x;
+ 115   1          T_dat=Read_Temperature();
+ 116   1          if((T_dat&0xf800)==0x0000)
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 3   
+
+ 117   1              {
+ 118   2                      temp_f=T_dat*0.0625;
+ 119   2                      temp_z=temp_f;
+ 120   2                      if(temp_z/10>=1)
+ 121   2                      {
+ 122   3                              updateLed(3,temp_z/10);
+ 123   3                      }
+ 124   2                      updateLed(4,temp_z%10);
+ 125   2                      temp_x=(temp_f-temp_z)*10;
+ 126   2          }
+ 127   1          else
+ 128   1              {
+ 129   2                      temp_f=(~T_dat+0x01)*0.0625;
+ 130   2                      temp_z=temp_f;
+ 131   2                      if(temp_z/10>=1)
+ 132   2                      {
+ 133   3                              updateLed(4,11);
+ 134   3                              updateLed(5,temp_z/10);
+ 135   3                      }
+ 136   2                      else
+ 137   2                      {
+ 138   3                              updateLed(5,11);
+ 139   3                      }
+ 140   2                      updateLed(6,temp_z%10);
+ 141   2                      temp_x=(temp_f-temp_z)*10;
+ 142   2                      updateLed(7,temp_x);
+ 143   2          }
+ 144   1      }
+ 145          
+ 146          
+ 147          void doShowTemperature2()
+ 148          {
+ 149   1          unsigned int T_dat;
+ 150   1          float temp_f;
+ 151   1          char temp_z;
+ 152   1          char temp_x;
+ 153   1          T_dat=Read_Temperature();
+ 154   1          if((T_dat&0xf800)==0x0000)
+ 155   1              {
+ 156   2                      temp_f=T_dat*0.0625;
+ 157   2                      temp_z=temp_f;
+ 158   2                      if(temp_z/10>=1)
+ 159   2                      {
+ 160   3                              updateLed(6,temp_z/10);
+ 161   3                      }
+ 162   2                      updateLed(7,temp_z%10);
+ 163   2                      temp_x=(temp_f-temp_z)*10;
+ 164   2          }
+ 165   1          else
+ 166   1              {
+ 167   2                      temp_f=(~T_dat+0x01)*0.0625;
+ 168   2                      temp_z=temp_f;
+ 169   2                      if(temp_z/10>=1)
+ 170   2                      {
+ 171   3                              updateLed(4,11);
+ 172   3                              updateLed(5,temp_z/10);
+ 173   3                      }
+ 174   2                      else
+ 175   2                      {
+ 176   3                              updateLed(5,11);
+ 177   3                      }
+ 178   2                      updateLed(6,temp_z%10);
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 4   
+
+ 179   2                      temp_x=(temp_f-temp_z)*10;
+ 180   2                      updateLed(7,temp_x);
+ 181   2          }
+ 182   1      }
+ 183          
+ 184          
+ 185          
+ 186          
+ 187          void display_VOL()
+ 188          {
+ 189   1              unsigned char convertVal;
+ 190   1              float vol;
+ 191   1              unsigned char val;
+ 192   1          ET0=0;
+ 193   1          convertVal=Read_PCF8591(0);
+ 194   1          ET0=1;
+ 195   1          vol=5.0/255*convertVal*0.198;
+ 196   1          val=vol*100;
+ 197   1          updateLed(6, val/10);
+ 198   1          updateLed(7, val%10);
+ 199   1      }
+ 200          void CheckSMG()
+ 201          {       
+ 202   1              SelectHC573(4);
+ 203   1              P0=0x00;
+ 204   1              P0 = 0xfe;
+ 205   1              SelectHC573(0);
+ 206   1      }
+ 207          
+ 208          void auto_start()
+ 209          {
+ 210   1              SelectHC573(6);
+ 211   1              Ds1302_Read_Time();
+ 212   1              TR0=1;
+ 213   1              updateLed(0,cur_time_buf[4]/10);
+ 214   1              updateLed(1,cur_time_buf[4]%10);
+ 215   1              updateLed(2,11);
+ 216   1              doShowTemperature();
+ 217   1              updateLed(5,11);
+ 218   1              display_VOL();
+ 219   1              
+ 220   1      }
+ 221          
+ 222          void auto_switch()
+ 223          {
+ 224   1              SelectHC573(6);
+ 225   1      
+ 226   1              updateLed(0,cur_time_buf[4]/10);
+ 227   1              updateLed(1,cur_time_buf[4]%10);
+ 228   1              updateLed(2,11);
+ 229   1              doShowTemperature();
+ 230   1              updateLed(5,11);
+ 231   1              Ds1302_Read_Time();
+ 232   1              TR0=1;
+ 233   1              updateLed(0,cur_time_buf[4]/10);
+ 234   1              updateLed(1,cur_time_buf[4]%10);
+ 235   1              
+ 236   1      }
+ 237          
+ 238          void auto_mode_select()
+ 239          {
+ 240   1              SelectHC573(6);
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 5   
+
+ 241   1              //Ds1302_Read_Time();
+ 242   1              TR0=1;
+ 243   1              updateLed(0,tempH/10%10);
+ 244   1              updateLed(1,tempH%10);
+ 245   1              updateLed(2,11);
+ 246   1              updateLed(3,tempL/10%10);
+ 247   1              updateLed(4,tempL%10);
+ 248   1              updateLed(5,11);
+ 249   1              display_VOL();
+ 250   1              //doShowTemperature2();
+ 251   1              //DelayMs(500);  
+ 252   1      }
+ 253          
+ 254          void ReaL(unsigned char R_flag)
+ 255          {
+ 256   1              if(R_flag)
+ 257   1              {
+ 258   2                      SelectHC573(5);
+ 259   2                      P0=0xff;
+ 260   2                      /*SelectHC573(4);
+ 261   2                      P0=0xff;*/
+ 262   2                      SelectHC573(0); 
+ 263   2              }
+ 264   1              else
+ 265   1              {
+ 266   2                      SelectHC573(5);
+ 267   2                      P0=0x00;
+ 268   2                      /*SelectHC573(4);
+ 269   2                      P0=0xff;*/
+ 270   2                      SelectHC573(0); 
+ 271   2              }
+ 272   1      }
+ 273          
+ 274          void initSystem()
+ 275          {
+ 276   1      
+ 277   1      
+ 278   1              SelectHC573(5);
+ 279   1              P0=0xff;
+ 280   1              SelectHC573(4);
+ 281   1              P0=0xff;
+ 282   1              SelectHC573(0);         
+ 283   1      
+ 284   1              /*else
+ 285   1              {
+ 286   1                      SelectHC573(5);
+ 287   1                      P0=0x00;
+ 288   1                      SelectHC573(4);
+ 289   1                      P0=0x00;
+ 290   1                      SelectHC573(0); 
+ 291   1              }*/
+ 292   1      
+ 293   1      }
+ 294          void scanKeys()
+ 295          {
+ 296   1              if(S7==0)
+ 297   1              {
+ 298   2                      DelayMs(5);
+ 299   2                      if(S7==0 && S7_switch == 0)
+ 300   2                      {
+ 301   3                              S7_switch = 1;
+ 302   3                              while(S7==0)
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 6   
+
+ 303   3                                      DelayMs(5);
+ 304   3                              SelectHC573(4);
+ 305   3                              P0 = 0xfd;              
+ 306   3                              SelectHC573(0);
+ 307   3                              is_select = 0;
+ 308   3                      }
+ 309   2                      else
+ 310   2                      {
+ 311   3                              S7_switch = 0;
+ 312   3                              while(S7==0)
+ 313   3                                      DelayMs(5);
+ 314   3                              SelectHC573(4);
+ 315   3                              P0 = 0xfe;              
+ 316   3                              SelectHC573(0);
+ 317   3                      }
+ 318   2              }
+ 319   1              if(S6==0)
+ 320   1              {
+ 321   2                      DelayMs(5);
+ 322   2                      if(S6==0&&S7_switch==1)
+ 323   2                      {
+ 324   3                              while(S6==0)
+ 325   3                              {
+ 326   4                                      DelayMs(5);
+ 327   4                              }
+ 328   3                              is_select = 0;
+ 329   3                      }
+ 330   2                      else if(S6==0&&S7_switch==0)
+ 331   2                      {
+ 332   3                              while(S6==0)
+ 333   3                              {
+ 334   4                                      DelayMs(5);
+ 335   4                              }
+ 336   3                              if(!is_select)
+ 337   3                              {
+ 338   4                                      is_select = 1;
+ 339   4                                      is_alarm = 0;
+ 340   4                              }
+ 341   3                                      
+ 342   3                              else
+ 343   3                              {
+ 344   4                                      is_select = 0;
+ 345   4                                      is_alarm = 1;
+ 346   4                              }
+ 347   3                                      
+ 348   3                      }
+ 349   2              }
+ 350   1              if(S5==0)
+ 351   1              {
+ 352   2                      DelayMs(5);
+ 353   2                      if(S5==0&&S7_switch==1)
+ 354   2                      {
+ 355   3                              while(S5==0)
+ 356   3                              {
+ 357   4                                      DelayMs(5);
+ 358   4                              }
+ 359   3                              is_sys = 1;
+ 360   3                              ReaL(1);
+ 361   3                      }
+ 362   2                      else if(S5==0&&S7_switch==0)
+ 363   2                      {
+ 364   3                              while(S5==0)
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 7   
+
+ 365   3                              {
+ 366   4                                      DelayMs(5);
+ 367   4                              }
+ 368   3                              tempH++;
+ 369   3                      }
+ 370   2              }
+ 371   1              if(S4==0)
+ 372   1              {
+ 373   2                      DelayMs(5);
+ 374   2                      if(S4==0&&S7_switch==1)
+ 375   2                      {
+ 376   3                              while(S4==0)
+ 377   3                              {
+ 378   4                                      DelayMs(5);
+ 379   4                              }
+ 380   3                              is_sys = 1;
+ 381   3                              ReaL(0);
+ 382   3                      }
+ 383   2                      else if(S4==0&&S7_switch==0)
+ 384   2                      {
+ 385   3                              while(S4==0)
+ 386   3                              {
+ 387   4                                      DelayMs(5);
+ 388   4                              }
+ 389   3                              tempL--;
+ 390   3                      }
+ 391   2              }
+ 392   1      }
+ 393          void temperture_check()
+ 394          {
+ 395   1          unsigned int T_dat;
+ 396   1          float temp_f;
+ 397   1          T_dat=Read_Temperature();
+ 398   1          if((T_dat&0xf800)==0x0000)
+ 399   1                      temp_f=T_dat*0.0625;
+ 400   1          else
+ 401   1                      temp_f=(~T_dat+0x01)*0.0625;
+ 402   1                              
+ 403   1              if(temp_f > tempH)
+ 404   1              {
+ 405   2                      if(is_select)
+ 406   2                      {
+ 407   3                              if(is_alarm)
+ 408   3                                      Alarm(3);
+ 409   3                      }
+ 410   2                      else
+ 411   2                      {
+ 412   3                              //ReaL(1);
+ 413   3                      }
+ 414   2                      
+ 415   2              }
+ 416   1              else if(temp_f < tempL)
+ 417   1              {
+ 418   2                      if(is_select)
+ 419   2                      {
+ 420   3                              if(is_alarm)
+ 421   3                                      Alarm(3);
+ 422   3                      }
+ 423   2                      else
+ 424   2                      {
+ 425   3                              //ReaL(1);
+ 426   3                      }
+C51 COMPILER V9.56.0.0   MAIN                                                              07/06/2022 15:20:25 PAGE 8   
+
+ 427   2              }
+ 428   1      }
+ 429          void main()
+ 430          {
+ 431   1              Ds1302_Init();
+ 432   1              init_timer0();
+ 433   1              initSystem();
+ 434   1              Ds1302_Write_Time();
+ 435   1      
+ 436   1              tempL = 10;
+ 437   1              tempH = 25;
+ 438   1              sendBytesTo24C02(0x05, &tempL, 1);
+*** WARNING C182 IN LINE 438 OF main.c: pointer to different objects
+ 439   1              sendBytesTo24C02(0x07, &tempL, 1);
+*** WARNING C182 IN LINE 439 OF main.c: pointer to different objects
+ 440   1              DelayMs(10);
+ 441   1              while(1)
+ 442   1              {
+ 443   2                      if(readTimeFlag==1)//&&is_select==0
+ 444   2                      {
+ 445   3                              if(!auto_flag)
+ 446   3                              {
+ 447   4                                      CheckSMG();
+ 448   4                                      auto_flag= 1;
+ 449   4                              }       
+ 450   3                              readTimeFlag==0;
+*** WARNING C275 IN LINE 450 OF main.c: expression with possibly no effect
+ 451   3                              if(!is_select)
+ 452   3                                      auto_start();
+ 453   3                              else
+ 454   3                                      auto_mode_select();
+ 455   3                      }
+ 456   2                      scanKeys();
+ 457   2                      temperture_check();
+ 458   2                      DelayMs(10);
+ 459   2              }
+ 460   1      }
+ 461                  
+ 462                  
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1588    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     12      32
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      6    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  3 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,246 @@
+C51 COMPILER V9.56.0.0   IIC                                                               07/06/2022 13:48:31 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE IIC
+OBJECT MODULE PLACED IN .\Objects\iic.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE iic.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\iic.l
+                    -st) OBJECT(.\Objects\iic.obj)
+
+line level    source
+
+   1          
+   2          /*-----------------------------------------------
+   3            名称：IIC协议 
+   4            论坛：www.doflye.net
+   5            编写：shifang
+   6            修改：无
+   7            内容：函数是采用软件延时的方法产生SCL脉冲,固对高晶振频率要作 一定的修改....(本例是1us机器
+   8                          周期,即晶振频率要小于12MHZ)
+   9          ------------------------------------------------*/  
+  10            
+  11          #include "iic.h"
+  12          #include "delay.h"
+  13          #include <reg52.h> 
+  14          
+  15          
+  16          #define ADDR_PCF8591  0x90  //PCF8591器件地址  1001 0000 写，读+1
+  17          #define ADDR_24C02    0xA0  //24C02器件地址  1010 0000    写，读+1
+  18          
+  19          sbit SDA=P2^0;
+  20          sbit SCL=P2^1;
+  21          
+  22          void Delay_IIC(unsigned char time){
+  23   1              while(time--);
+  24   1      }
+  25          
+  26          void IIC_Start(void){
+  27   1              SDA=1;
+  28   1              SCL=1;
+  29   1              Delay_IIC(5);
+  30   1              SDA=0;
+  31   1              Delay_IIC(5);
+  32   1              SCL=0;
+  33   1      }
+  34          
+  35          void IIC_Stop(void){
+  36   1              SDA=0;
+  37   1              SCL=1;
+  38   1              Delay_IIC(5);
+  39   1              SDA=1;
+  40   1              Delay_IIC(5);
+  41   1      }
+  42          
+  43          void IIC_Ack(unsigned char ackbit){
+  44   1              if(ackbit)      SDA=0;
+  45   1              else            SDA=1;
+  46   1      
+  47   1              Delay_IIC(5);
+  48   1              SCL=1;
+  49   1              Delay_IIC(5);
+  50   1              SCL=0;
+  51   1              SDA=1;
+  52   1              Delay_IIC(5);;
+  53   1      }
+  54          
+C51 COMPILER V9.56.0.0   IIC                                                               07/06/2022 13:48:31 PAGE 2   
+
+  55          bit IIC_WaitAck(void){
+  56   1              SDA=1;
+  57   1              Delay_IIC(5);
+  58   1              SCL=1;
+  59   1              Delay_IIC(5);
+  60   1      
+  61   1              if(SDA){
+  62   2                      SCL=0;
+  63   2                      IIC_Stop();
+  64   2                      return 0;
+  65   2              }
+  66   1              else{
+  67   2                      SCL=0;
+  68   2                      return 1;
+  69   2              }
+  70   1      }
+  71          
+  72          void IIC_SendByte(unsigned char byt){
+  73   1              unsigned char i;
+  74   1              for(i=0;i<8;i++){
+  75   2                      if(byt & 0x80)  SDA=1;
+  76   2                      else                    SDA=0;
+  77   2              
+  78   2      
+  79   2                      Delay_IIC(5);
+  80   2                      SCL=1;
+  81   2                      byt<<=1;
+  82   2                      Delay_IIC(5);
+  83   2                      SCL=0;
+  84   2              }
+  85   1      }
+  86          
+  87          unsigned char IIC_RecByte(void){
+  88   1              unsigned char da, i;
+  89   1              for(i=0;i<8;i++){
+  90   2                      SCL=1;
+  91   2                      Delay_IIC(5);
+  92   2                      da<<=1;
+  93   2                      if(SDA) da|=0x01;
+  94   2                      SCL=0;
+  95   2                      Delay_IIC(5);
+  96   2              }
+  97   1              return da;
+  98   1      }
+  99          
+ 100          unsigned char Read_PCF8591(unsigned char com ){
+ 101   1       unsigned char dat;
+ 102   1       
+ 103   1        IIC_Start();
+ 104   1        IIC_SendByte(ADDR_PCF8591);  //???????0x90
+ 105   1        IIC_WaitAck();   
+ 106   1        IIC_SendByte(com); //?????? com
+ 107   1        IIC_WaitAck();  
+ 108   1        IIC_Stop(); 
+ 109   1       
+ 110   1        IIC_Start();
+ 111   1        IIC_SendByte(ADDR_PCF8591+1); //???????0x91
+ 112   1        IIC_WaitAck(); 
+ 113   1        dat = IIC_RecByte(); //??????? 
+ 114   1        IIC_Ack(0); 
+ 115   1        IIC_Stop(); 
+ 116   1       
+C51 COMPILER V9.56.0.0   IIC                                                               07/06/2022 13:48:31 PAGE 3   
+
+ 117   1        return dat; //????Information
+ 118   1      }
+ 119          
+ 120          
+ 121          
+ 122          
+ 123          bit sendBytesTo24C02(unsigned char suba,unsigned char *p,unsigned char no)
+ 124          {
+ 125   1         unsigned char i;
+ 126   1              for(i=0;i<no;i++)
+ 127   1              { 
+ 128   2              IIC_Start();                    //????
+ 129   2              IIC_SendByte(ADDR_24C02);       //??????
+ 130   2          IIC_WaitAck();
+ 131   2                      IIC_SendByte(suba);         //???????
+ 132   2          IIC_WaitAck();
+ 133   2                      IIC_SendByte(*p);            //????
+ 134   2                      IIC_WaitAck();
+ 135   2          IIC_Stop();                  //????
+ 136   2                      
+ 137   2                      DelayMs(1);               //??????????????????
+ 138   2                      p++;
+ 139   2                      suba++;
+ 140   2         } 
+ 141   1              return (1);
+ 142   1      }
+ 143          
+ 144          bit recBytesFrom24C02(unsigned char suba,unsigned char *p,unsigned char no)
+ 145          {
+ 146   1              unsigned char i;
+ 147   1        IIC_Start();               //????                      
+ 148   1        IIC_SendByte(ADDR_24C02);             //??????
+ 149   1              IIC_WaitAck();          
+ 150   1              IIC_SendByte(suba);            //???????
+ 151   1              IIC_WaitAck();
+ 152   1        IIC_Start();
+ 153   1        IIC_SendByte(ADDR_24C02+1);                           //??? 1
+ 154   1              IIC_WaitAck();
+ 155   1              
+ 156   1              for(i=0;i<no-1;i++) 
+ 157   1              { 
+ 158   2          *p=IIC_RecByte();              //????
+ 159   2           IIC_Ack(1);                //????? 
+ 160   2           p++;
+ 161   2        } 
+ 162   1              *p=IIC_RecByte();
+ 163   1          IIC_Ack(0);                 //?????
+ 164   1          IIC_Stop();                    //????
+ 165   1              return(1);
+ 166   1      }
+ 167          
+ 168          /*unsigned char Read_PCF8591(unsigned char com)
+ 169          {
+ 170                  unsigned char dat;
+ 171                  
+ 172                  IIC_Start();
+ 173                  IIC_SendByte(ADDR_PCF8591);
+ 174                  IIC_WaitAck();
+ 175                  IIC_SendByte(com);
+ 176                  IIC_WaitAck();
+ 177                  IIC_Stop();
+ 178                  
+C51 COMPILER V9.56.0.0   IIC                                                               07/06/2022 13:48:31 PAGE 4   
+
+ 179                  IIC_Start();
+ 180                  IIC_SendByte(ADDR_PCF8591 + 1);
+ 181                  IIC_WaitAck();
+ 182                  dat = IIC_RecByte();
+ 183                  IIC_Ack(0);
+ 184                  IIC_Stop();
+ 185                  
+ 186                  return dat;
+ 187          }
+ 188          */
+ 189          
+ 190          
+ 191          
+ 192          
+ 193          
+ 194          
+ 195          
+ 196          
+ 197          
+ 198          
+ 199          
+ 200          
+ 201          
+ 202          
+ 203          
+ 204          
+ 205          
+ 206          
+ 207          
+ 208          
+ 209          
+ 210          
+ 211          
+ 212          
+ 213          
+ 214          
+ 215          
+ 216          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    351    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      12
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

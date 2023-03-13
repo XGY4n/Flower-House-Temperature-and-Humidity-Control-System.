@@ -1,0 +1,9 @@
+".\Objects\smg.obj",
+".\Objects\main.obj",
+".\Objects\delay.obj",
+".\Objects\ds1302.obj",
+".\Objects\onewire.obj",
+".\Objects\iic.obj",
+".\Objects\select573.obj" 
+TO ".\Objects\308-Greenhouse-control" 
+PRINT(".\Listings\308-Greenhouse-control.m51") RAMSIZE(256) 

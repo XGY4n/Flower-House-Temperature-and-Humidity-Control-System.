@@ -1,0 +1,53 @@
+C51 COMPILER V9.56.0.0   SMG                                                               07/06/2022 13:48:30 PAGE 1   
+
+
+C51 COMPILER V9.56.0.0, COMPILATION OF MODULE SMG
+OBJECT MODULE PLACED IN .\Objects\smg.obj
+COMPILER INVOKED BY: C:\Keil_v5\C51\BIN\C51.EXE smg.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\smg.l
+                    -st) OBJECT(.\Objects\smg.obj)
+
+line level    source
+
+   1          #include "reg52.h" 
+   2          #include "delay.h"
+   3          #define uchar unsigned char
+   4          #define unit unsigned int 
+   5          uchar zixing[]={0xc0,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90,0xff,0xbf,0x7f};
+   6          uchar weix[8]={0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80};
+   7          uchar duanx[8]={0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
+   8          void showLed(){
+   9   1               static unsigned char index=0;
+  10   1               P0=weix[index];
+  11   1               P2=((P2&0x1f)|0xc0);
+  12   1               P2&=0x1f;
+  13   1                      
+  14   1               P0=duanx[index];
+  15   1               P2=((P2&0x1f)|0xe0);
+  16   1               P2&=0x1f;
+  17   1               
+  18   1               P2=((P2&0x1f)|0xe0);
+  19   1               P2&=0x1f;
+  20   1               index++;
+  21   1                      //DelayUs2x(1000);
+  22   1               if(index==8) index=0;
+  23   1      }
+  24          void updateLed(unsigned char index, unsigned char digit){
+  25   1       duanx[index]=zixing[digit];
+  26   1      }
+  27          void addDot (unsigned char index){
+  28   1       duanx[index]=duanx[index]&0x7f;
+  29   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     82    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     30    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
